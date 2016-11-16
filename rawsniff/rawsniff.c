@@ -11,32 +11,37 @@ static void setup(libusb_device_handle *dev)
 {
     int ret;
     
-    // ?
-    ret = libusb_control_transfer(dev, 0x40, 0xC5, 0x00, 0x04, NULL, 0, TIMEOUT);
-    printf("ret0 = %d\n", ret);
+    // read ident
+    uint8_t ident[32];
+    ret = libusb_control_transfer(dev, 0xC0, 0xC0, 0x00, 0x00, ident, sizeof(ident), TIMEOUT);
+    if (ret > 0) {
+        int i;
+        printf("IDENT:");
+        for (i = 0; i < ret; i++) {
+            printf(" %02X", ident[i]);
+        }
+        printf("\n");
+    }
     
-    // get status?
+    // set power
+    ret = libusb_control_transfer(dev, 0x40, 0xC5, 0x00, 0x04, NULL, 0, TIMEOUT);
+    
+    // get power
     uint8_t data;
     ret = libusb_control_transfer(dev, 0xC0, 0xC6, 0x00, 0x00, &data, 1, TIMEOUT);
-    printf("ret1 = %d, data = %02X\n", ret, data);
     ret = libusb_control_transfer(dev, 0xC0, 0xC6, 0x00, 0x00, &data, 1, TIMEOUT);
-    printf("ret2 = %d, data = %02X\n", ret, data);
 
     // ?
     ret = libusb_control_transfer(dev, 0x40, 0xC9, 0x00, 0x00, NULL, 0, TIMEOUT);
-    printf("ret3 = %d\n", ret);
 
     // set capture channel
     data = 0x27;
     ret = libusb_control_transfer(dev, 0x40, 0xD2, 0x00, 0x00, &data, 1, TIMEOUT);
-    printf("ret4 = %d\n", ret);
     data = 0x00;
     ret = libusb_control_transfer(dev, 0x40, 0xD2, 0x00, 0x01, &data, 1, TIMEOUT);
-    printf("ret5 = %d\n", ret);
 
     // start capture?
     ret = libusb_control_transfer(dev, 0x40, 0xD0, 0x00, 0x00, NULL, 0, TIMEOUT);
-    printf("ret6 = %d\n", ret);
 }
 
 static void bulk_read(libusb_device_handle *dev)
