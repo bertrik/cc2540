@@ -7,13 +7,21 @@
 
 #define TIMEOUT 1000
 
+// from https://github.com/andrewdodd/ccsniffpiper/blob/master/ccsniffpiper.py
+#define GET_IDENT   0xC0
+#define SET_POWER   0xC5
+#define GET_POWER   0xC6
+#define SET_START   0xD0
+#define SET_END     0xD1
+#define SET_CHAN    0xD2
+
 static void setup(libusb_device_handle *dev)
 {
     int ret;
     
     // read ident
     uint8_t ident[32];
-    ret = libusb_control_transfer(dev, 0xC0, 0xC0, 0x00, 0x00, ident, sizeof(ident), TIMEOUT);
+    ret = libusb_control_transfer(dev, 0xC0, GET_IDENT, 0x00, 0x00, ident, sizeof(ident), TIMEOUT);
     if (ret > 0) {
         int i;
         printf("IDENT:");
@@ -24,24 +32,24 @@ static void setup(libusb_device_handle *dev)
     }
     
     // set power
-    ret = libusb_control_transfer(dev, 0x40, 0xC5, 0x00, 0x04, NULL, 0, TIMEOUT);
+    ret = libusb_control_transfer(dev, 0x40, SET_POWER, 0x00, 0x04, NULL, 0, TIMEOUT);
     
     // get power
     uint8_t data;
-    ret = libusb_control_transfer(dev, 0xC0, 0xC6, 0x00, 0x00, &data, 1, TIMEOUT);
-    ret = libusb_control_transfer(dev, 0xC0, 0xC6, 0x00, 0x00, &data, 1, TIMEOUT);
+    ret = libusb_control_transfer(dev, 0xC0, GET_POWER, 0x00, 0x00, &data, 1, TIMEOUT);
+    ret = libusb_control_transfer(dev, 0xC0, GET_POWER, 0x00, 0x00, &data, 1, TIMEOUT);
 
     // ?
     ret = libusb_control_transfer(dev, 0x40, 0xC9, 0x00, 0x00, NULL, 0, TIMEOUT);
 
     // set capture channel
     data = 0x27;
-    ret = libusb_control_transfer(dev, 0x40, 0xD2, 0x00, 0x00, &data, 1, TIMEOUT);
+    ret = libusb_control_transfer(dev, 0x40, SET_CHAN, 0x00, 0x00, &data, 1, TIMEOUT);
     data = 0x00;
-    ret = libusb_control_transfer(dev, 0x40, 0xD2, 0x00, 0x01, &data, 1, TIMEOUT);
+    ret = libusb_control_transfer(dev, 0x40, SET_CHAN, 0x00, 0x01, &data, 1, TIMEOUT);
 
     // start capture?
-    ret = libusb_control_transfer(dev, 0x40, 0xD0, 0x00, 0x00, NULL, 0, TIMEOUT);
+    ret = libusb_control_transfer(dev, 0x40, SET_START, 0x00, 0x00, NULL, 0, TIMEOUT);
 }
 
 static void bulk_read(libusb_device_handle *dev)
