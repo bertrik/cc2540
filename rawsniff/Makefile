@@ -6,3 +6,6 @@ LDFLAGS = $(shell pkg-config $(LIBUSB) --libs)
 
 all: rawsniff
 
+clean:
+	rm -f rawsniff
+
