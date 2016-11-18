@@ -15,7 +15,7 @@
 #define SET_END     0xD1
 #define SET_CHAN    0xD2
 
-static void setup(libusb_device_handle *dev)
+static void setup(libusb_device_handle *dev, uint8_t channel)
 {
     int ret;
     
@@ -43,7 +43,7 @@ static void setup(libusb_device_handle *dev)
     ret = libusb_control_transfer(dev, 0x40, 0xC9, 0x00, 0x00, NULL, 0, TIMEOUT);
 
     // set capture channel
-    data = 0x27;
+    data = channel;
     ret = libusb_control_transfer(dev, 0x40, SET_CHAN, 0x00, 0x00, &data, 1, TIMEOUT);
     data = 0x00;
     ret = libusb_control_transfer(dev, 0x40, SET_CHAN, 0x00, 0x01, &data, 1, TIMEOUT);
@@ -79,7 +79,7 @@ static void sniff(libusb_context *context, uint16_t pid, uint16_t vid)
     if (dev != NULL) {
         printf("Opened device %04X:%04X\n", pid, vid);
     
-        setup(dev);
+        setup(dev, 0x27);
         bulk_read(dev);
 
         libusb_close(dev);
