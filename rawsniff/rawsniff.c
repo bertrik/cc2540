@@ -15,12 +15,13 @@
 #define SET_END     0xD1
 #define SET_CHAN    0xD2
 
-static void setup(libusb_device_handle *dev, uint8_t channel)
+#define POWER_RETRIES 10
+
+static int get_ident(libusb_device_handle *dev)
 {
+    uint8_t ident[32];
     int ret;
     
-    // read ident
-    uint8_t ident[32];
     ret = libusb_control_transfer(dev, 0xC0, GET_IDENT, 0x00, 0x00, ident, sizeof(ident), TIMEOUT);
     if (ret > 0) {
         int i;
@@ -30,26 +31,76 @@ static void setup(libusb_device_handle *dev, uint8_t channel)
         }
         printf("\n");
     }
+    return ret;
+}
+
+static int set_power(libusb_device_handle *dev, uint8_t power, int retries)
+{
+    int ret;
+
+   // set power
+    ret = libusb_control_transfer(dev, 0x40, SET_POWER, 0x00, power, NULL, 0, TIMEOUT);
+    
+    // get power until it is the same as configured in set_power
+    int i;
+    for (i = 0; i < retries; i++) {
+        uint8_t data;
+        ret = libusb_control_transfer(dev, 0xC0, GET_POWER, 0x00, 0x00, &data, 1, TIMEOUT);
+        if (ret < 0) {
+            return ret;
+        }
+        if (data == power) {
+            return 0;
+        }
+    }
+    return ret;
+}
+
+static int set_channel(libusb_device_handle *dev, uint8_t channel)
+{
+    int ret;
+    uint8_t data;
+
+    data = channel;
+    ret = libusb_control_transfer(dev, 0x40, SET_CHAN, 0x00, 0x00, &data, 1, TIMEOUT);
+    data = 0;
+    ret = libusb_control_transfer(dev, 0x40, SET_CHAN, 0x00, 0x01, &data, 1, TIMEOUT);
+
+    return ret;
+}
+
+static int setup(libusb_device_handle *dev, uint8_t channel)
+{
+    int ret;
+    
+    // read ident
+    ret = get_ident(dev);
+    if (ret < 0) {
+        printf("getting identity failed!\n");
+        return ret;
+    }
     
     // set power
-    ret = libusb_control_transfer(dev, 0x40, SET_POWER, 0x00, 0x04, NULL, 0, TIMEOUT);
-    
-    // get power
-    uint8_t data;
-    ret = libusb_control_transfer(dev, 0xC0, GET_POWER, 0x00, 0x00, &data, 1, TIMEOUT);
-    ret = libusb_control_transfer(dev, 0xC0, GET_POWER, 0x00, 0x00, &data, 1, TIMEOUT);
+    ret = set_power(dev, 0x04, POWER_RETRIES);
+    if (ret < 0) {
+        printf("setting power failed!\n");
+        return ret;
+    }
 
     // ?
     ret = libusb_control_transfer(dev, 0x40, 0xC9, 0x00, 0x00, NULL, 0, TIMEOUT);
 
     // set capture channel
-    data = channel;
-    ret = libusb_control_transfer(dev, 0x40, SET_CHAN, 0x00, 0x00, &data, 1, TIMEOUT);
-    data = 0x00;
-    ret = libusb_control_transfer(dev, 0x40, SET_CHAN, 0x00, 0x01, &data, 1, TIMEOUT);
+    ret = set_channel(dev, channel);
+    if (ret < 0) {
+        printf("setting channel failed!\n");
+        return ret;
+    }
 
     // start capture?
     ret = libusb_control_transfer(dev, 0x40, SET_START, 0x00, 0x00, NULL, 0, TIMEOUT);
+
+    return ret;
 }
 
 static void bulk_read(libusb_device_handle *dev)
@@ -78,9 +129,14 @@ static void sniff(libusb_context *context, uint16_t pid, uint16_t vid)
     libusb_device_handle *dev = libusb_open_device_with_vid_pid(context, pid, vid);
     if (dev != NULL) {
         printf("Opened device %04X:%04X\n", pid, vid);
-    
-        setup(dev, 0x27);
-        bulk_read(dev);
+
+        int ret;
+        ret = setup(dev, 0x27);
+        if (ret < 0) {
+            printf("Sniffer setup failed!\n");
+        } else {
+            bulk_read(dev);
+        }
 
         libusb_close(dev);
     } else {
