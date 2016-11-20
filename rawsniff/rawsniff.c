@@ -61,15 +61,15 @@ static int set_channel(libusb_device_handle *dev, uint8_t channel)
     int ret;
     uint8_t data;
 
-    data = channel;
+    data = channel & 0xFF;
     ret = libusb_control_transfer(dev, 0x40, SET_CHAN, 0x00, 0x00, &data, 1, TIMEOUT);
-    data = 0;
+    data = (channel >> 8) & 0xFF;
     ret = libusb_control_transfer(dev, 0x40, SET_CHAN, 0x00, 0x01, &data, 1, TIMEOUT);
 
     return ret;
 }
 
-static int setup(libusb_device_handle *dev, uint8_t channel)
+static int setup(libusb_device_handle *dev, int channel)
 {
     int ret;
     
@@ -124,14 +124,14 @@ static void bulk_read(libusb_device_handle *dev)
     }
 }
 
-static void sniff(libusb_context *context, uint16_t pid, uint16_t vid)
+static void sniff(libusb_context *context, uint16_t pid, uint16_t vid, int channel)
 {
     libusb_device_handle *dev = libusb_open_device_with_vid_pid(context, pid, vid);
     if (dev != NULL) {
-        printf("Opened device %04X:%04X\n", pid, vid);
+        printf("Opened USB device %04X:%04X\n", pid, vid);
 
         int ret;
-        ret = setup(dev, 0x27);
+        ret = setup(dev, channel);
         if (ret < 0) {
             printf("Sniffer setup failed!\n");
         } else {
@@ -140,19 +140,23 @@ static void sniff(libusb_context *context, uint16_t pid, uint16_t vid)
 
         libusb_close(dev);
     } else {
-        printf("device %04X:%04X not found!\n", pid, vid);
+        printf("USB device %04X:%04X not found!\n", pid, vid);
     }
 }
 
 int main(int argc, char *argv[])
 {
-    (void)argc;
-    (void)argv;
+    // channels 37,38,39 are the advertisement channels
+    int channel = 37;
+    if (argc > 1) {
+        channel = atoi(argv[1]);
+    }
+    printf("Sniffing BLE traffic on channel %d\n", channel);
 
     libusb_context *context;
     libusb_init(&context);
     libusb_set_debug(context, LIBUSB_LOG_LEVEL_WARNING);
-    sniff(context, 0x451, 0x16B3);
+    sniff(context, 0x451, 0x16B3, channel);
     libusb_exit(context);
     
     return 0;
