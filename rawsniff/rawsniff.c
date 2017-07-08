@@ -63,8 +63,16 @@ static int set_channel(libusb_device_handle *dev, uint8_t channel)
 
     data = channel & 0xFF;
     ret = libusb_control_transfer(dev, 0x40, SET_CHAN, 0x00, 0x00, &data, 1, TIMEOUT);
+    if (ret < 0) {
+        printf("setting channel (LSB) failed!\n");
+        return ret;
+    }
     data = (channel >> 8) & 0xFF;
     ret = libusb_control_transfer(dev, 0x40, SET_CHAN, 0x00, 0x01, &data, 1, TIMEOUT);
+    if (ret < 0) {
+        printf("setting channel (LSB) failed!\n");
+        return ret;
+    }
 
     return ret;
 }
@@ -89,6 +97,10 @@ static int setup(libusb_device_handle *dev, int channel)
 
     // ?
     ret = libusb_control_transfer(dev, 0x40, 0xC9, 0x00, 0x00, NULL, 0, TIMEOUT);
+    if (ret < 0) {
+        printf("setting reg 0xC9 failed!\n");
+        return ret;
+    }
 
     // set capture channel
     ret = set_channel(dev, channel);
@@ -105,12 +117,10 @@ static int setup(libusb_device_handle *dev, int channel)
 
 static void bulk_read(libusb_device_handle *dev)
 {
-    int ret;
-    int xfer;
     uint8_t data[1024];
     while (1) {
-        xfer = 0;
-        ret = libusb_bulk_transfer(dev, 0x83, data, sizeof(data), &xfer, TIMEOUT);
+        int xfer = 0;
+        int ret = libusb_bulk_transfer(dev, 0x83, data, sizeof(data), &xfer, TIMEOUT);
         if (ret == 0) {
             int i;
             for (i = 0; i < xfer; i++) {
