@@ -165,7 +165,7 @@ int main(int argc, char *argv[])
 
     libusb_context *context;
     libusb_init(&context);
-    libusb_set_debug(context, LIBUSB_LOG_LEVEL_WARNING);
+    libusb_set_option(context, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_WARNING);
     sniff(context, 0x451, 0x16B3, channel);
     libusb_exit(context);
     
