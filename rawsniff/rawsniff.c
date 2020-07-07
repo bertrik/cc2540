@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <pcap.h>
 
 #define TIMEOUT 1000
 
@@ -87,12 +88,24 @@ static int setup(libusb_device_handle *dev, int channel)
         printf("getting identity failed!\n");
         return ret;
     }
+    ret = libusb_claim_interface(dev, 0);
+    if (ret < 0) {
+        printf("claim interface failed!\n");
+        exit(1);
+        // return ret;
+    }
+
+    ret = libusb_set_configuration( dev, 1);
+    if (ret < 0) {
+        printf("setting configuraiton failed!\n");
+        // return ret;
+    }
     
     // set power
     ret = set_power(dev, 0x04, POWER_RETRIES);
     if (ret < 0) {
         printf("setting power failed!\n");
-        return ret;
+        // return ret;
     }
 
     // ?
@@ -115,14 +128,14 @@ static int setup(libusb_device_handle *dev, int channel)
     return ret;
 }
 
-static void bulk_read(libusb_device_handle *dev)
+void bulk_read(pcap_dumper_t* pd, libusb_device_handle *dev)
 {
-    uint8_t data[1024];
+    uint8_t data[200];
     while (1) {
         int xfer = 0;
         int ret = libusb_bulk_transfer(dev, 0x83, data, sizeof(data), &xfer, TIMEOUT);
         if (ret == 0) {
-            int i;
+           /* int i;
             for (i = 0; i < xfer; i++) {
                 if ((i % 16) == 0) {
                     printf("\n%04X:", i);
@@ -130,9 +143,36 @@ static void bulk_read(libusb_device_handle *dev)
                 printf(" %02X", data[i]);
             }
             printf("\n");
-        }
+*/
+            struct pcap_pkthdr packet_header;
+            struct timeval ts;
+/*
+            if (data[0] != 0) {
+              printf("LEN TOO LARGE");
+              return;
+            }
+            int len = data[1];
+            if (len != xfer - 3) {
+               printf("LEN inconsistent");
+              return;
+            }
+            int plen = data[7];
+            if (plen != len - 5) {
+              printf("plen %d inconsistent %d\n", plen, len);
+              return;
+            }*/
+            printf(".");
+            if (xfer > 8 ) {
+            gettimeofday(&packet_header.ts, NULL);
+            packet_header.caplen = xfer - 8 -2;
+            packet_header.len = xfer -8 -2;
+            pcap_dump( (u_char * ) pd, &packet_header, data+8);
+            }
+            
+        } 
     }
 }
+
 
 static void sniff(libusb_context *context, uint16_t pid, uint16_t vid, int channel)
 {
@@ -145,7 +185,9 @@ static void sniff(libusb_context *context, uint16_t pid, uint16_t vid, int chann
         if (ret < 0) {
             printf("Sniffer setup failed!\n");
         } else {
-            bulk_read(dev);
+            pcap_t *pcapt = pcap_open_dead( 251, 100);
+            pcap_dumper_t *pd = pcap_dump_open( pcapt, "out.pcap");
+            bulk_read(pd, dev);
         }
 
         libusb_close(dev);
@@ -164,7 +206,11 @@ int main(int argc, char *argv[])
     printf("Sniffing BLE traffic on channel %d\n", channel);
 
     libusb_context *context;
-    libusb_init(&context);
+    int ret = libusb_init(&context);
+    if (ret != 0) {
+       printf("init failed!\n");
+       exit(1);
+    }
     libusb_set_option(context, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_WARNING);
     sniff(context, 0x451, 0x16B3, channel);
     libusb_exit(context);
